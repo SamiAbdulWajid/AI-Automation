@@ -1,0 +1,495 @@
+{
+  "name": "AI Email Automation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f4e2df1f-d080-417e-8aa0-90e0c1c7d954",
+      "name": "Gmail Trigger",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "d07cdc22-fd3f-4774-afce-c5a83eb65c4e",
+      "name": "Wait",
+      "webhookId": "cec3c507-a7bb-4352-b5d8-eef183420bd2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "967e4304-1bb1-47c2-9379-2fd2f2215dac",
+              "name": "sender_name",
+              "value": "={{$json[\"From\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "3667a246-11f2-4ddc-bfc5-6d4857dd2c65",
+              "name": "sender_email",
+              "value": "={{$json[\"From\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "8be939d3-73ca-4d0d-b538-921a8a5d0085",
+              "name": "subject",
+              "value": "={{$json[\"Subject\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "392e2ea6-48a1-4a35-9ac3-4f42f236d36f",
+              "name": "body",
+              "value": "={{$json[\"snippet\"]}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "df6bb307-4550-4bce-ad09-1fd60fb448ec",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        496,
+        208
+      ],
+      "id": "31af1513-1d36-4a1b-aa6e-e7db5e25094e",
+      "name": "Groq Chat Model",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Classify the email.\n\nSubject: {{$json.subject}}\nBody: {{$json.body}}\n\nReturn ONLY JSON:\n{\n \"intent\": \"\",\n \"urgency\": \"\",\n \"category\": \"\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "656ef569-cabf-4f3c-b08a-94689d26c5bd",
+      "name": "AI Agent 1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Decide what to do with the email.\n\nSubject: {{$node[\"Edit Fields\"].json[\"subject\"]}}\nBody: {{$node[\"Edit Fields\"].json[\"body\"]}}\n\nStrict Rules:\n- If email contains greeting or casual message (Hi, Hello, How are you, Thanks, etc) \u2192 action = reply\n- If email asks something or expects response \u2192 action = reply\n- If email mentions later/tomorrow/follow up \u2192 action = follow-up\n- If email is advertisement, promotion, discount, offer \u2192 action = ignore\n\nChoose:\n- action: reply / follow-up / ignore\n- tone: professional / polite / friendly / urgent\n\nReturn ONLY JSON:\n{\n \"action\": \"\",\n \"tone\": \"\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        976,
+        0
+      ],
+      "id": "e3334983-1458-468f-a740-28a566693337",
+      "name": "AI Agent 2"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d83beb0d-83df-4679-b27e-4c0ecf400970"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        0
+      ],
+      "id": "52e905d7-75db-4c40-a48b-8db818e6550e",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a follow-up action for this email.\n\nSubject: {{$node[\"Edit Fields\"].json[\"subject\"]}}\nBody: {{$node[\"Edit Fields\"].json[\"body\"]}}\n\nWrite a short follow-up note for reminder/event description.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1488,
+        0
+      ],
+      "id": "46b7c62f-c09b-4e67-98a3-3f1c80e85b64",
+      "name": "AI Agent 3 Follow Up"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a reply email based on the message.\n\nSubject: {{$node[\"Edit Fields\"].json[\"subject\"]}}\nBody: {{$node[\"Edit Fields\"].json[\"body\"]}}\nTone: {{ JSON.parse($node[\"AI Agent 2\"].json[\"output\"]).tone }}\n\nRules:\n- If message is greeting (Hi, Hello, How are you) \u2192 reply in 1-2 lines only\n- If message is normal request \u2192 give proper reply\n- Do NOT generate long formal email for short messages\n\nReply:",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1488,
+        -320
+      ],
+      "id": "c043231d-5a05-4693-8a4c-8a2d69a0c7d0",
+      "name": "AI Agent 3 Reply"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re: {{$node[\"Edit Fields\"].json[\"subject\"]}}",
+        "message": "={{$json.output}}",
+        "options": {
+          "sendTo": "={{$node[\"Edit Fields\"].json[\"sender_email\"]}}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        -320
+      ],
+      "id": "3a0cefa4-aa1d-47ba-bfa2-9d0c27c1cfa3",
+      "name": "Create a draft",
+      "webhookId": "16d25e04-dbfd-4bcb-b3bd-a822550a80a4",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "your-email@example.com"
+        },
+        "additionalFields": {
+          "description": "=Reply to {{$node[\"Edit Fields\"].json[\"sender_name\"]}}",
+          "summary": "=Reply Reminder - {{$node[\"Edit Fields\"].json[\"subject\"]}}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2000,
+        -320
+      ],
+      "id": "3b318416-2d90-4baa-bc7c-609d90f82c96",
+      "name": "Create an event",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "your-email@example.com",
+          "mode": "list",
+          "cachedResultName": "your-email@example.com"
+        },
+        "start": "={{$now.plus(1, 'day')}}",
+        "end": "={{$now.plus(1, 'day').plus(1, 'hour')}}",
+        "additionalFields": {
+          "description": "={{$json.output}}",
+          "summary": "=Follow-up - {{$node[\"Edit Fields\"].json[\"subject\"]}}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1840,
+        0
+      ],
+      "id": "3f582281-a652-4a9f-b712-baba2ed1459e",
+      "name": "Create an event1",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        848,
+        208
+      ],
+      "id": "af10e9b8-5cad-41fc-92fd-0c09d0566925",
+      "name": "Groq Chat Model1",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        -128
+      ],
+      "id": "24e5a047-e816-4729-a582-354e8aa5d60d",
+      "name": "Groq Chat Model2",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        192
+      ],
+      "id": "abeba625-5f43-4b28-89ce-0bc85f3cfdf1",
+      "name": "Groq Chat Model3",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "task": "MTc3NzczMDQ5MjE3ODUyMjY3Mjc6MDow",
+        "title": "=Follow-up - {{$node[\"Edit Fields\"].json[\"subject\"]}}",
+        "additionalFields": {
+          "notes": "={{$node[\"AI Agent 3 Follow Up\"].json[\"output\"]}}"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasks",
+      "typeVersion": 1,
+      "position": [
+        2048,
+        0
+      ],
+      "id": "757ed00f-48fe-49a2-9599-436bf11112bf",
+      "name": "Create a task",
+      "credentials": {}
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent 1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent 1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent 2": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "AI Agent 3 Reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent 3 Follow Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent 3 Reply": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a draft": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent 3 Follow Up": {
+      "main": [
+        [
+          {
+            "node": "Create an event1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent 2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent 3 Reply",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent 3 Follow Up",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event1": {
+      "main": [
+        [
+          {
+            "node": "Create a task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
